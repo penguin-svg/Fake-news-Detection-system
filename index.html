@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fake News Detection System</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .main-container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .card {
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+        .header-card {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            text-align: center;
+            padding: 30px;
+        }
+        .header-card h1 {
+            margin: 0;
+            font-size: 2.5rem;
+            font-weight: bold;
+        }
+        .header-card p {
+            margin: 10px 0 0 0;
+            opacity: 0.9;
+        }
+        .input-card {
+            padding: 30px;
+        }
+        .form-label {
+            font-weight: 600;
+            color: #333;
+        }
+        .btn-analyze {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            padding: 12px 40px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            border-radius: 25px;
+            transition: transform 0.2s;
+        }
+        .btn-analyze:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        #results {
+            padding: 30px;
+            display: none;
+        }
+        .verdict-card {
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .verdict-HIGH {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+            color: white;
+        }
+        .verdict-MODERATE {
+            background: linear-gradient(135deg, #feca57 0%, #ff9ff3 100%);
+            color: #333;
+        }
+        .verdict-LOW {
+            background: linear-gradient(135deg, #48c774 0%, #06d6a0 100%);
+            color: white;
+        }
+        .score-badge {
+            display: inline-block;
+            padding: 10px 20px;
+            border-radius: 20px;
+            background: rgba(255,255,255,0.3);
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin: 10px;
+        }
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+        }
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+        .metric-label {
+            font-weight: 600;
+            color: #666;
+        }
+        .metric-value {
+            font-weight: 700;
+            color: #333;
+        }
+        .flag-item {
+            padding: 8px 15px;
+            margin: 5px;
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            border-radius: 5px;
+        }
+        .spinner-border {
+            display: none;
+        }
+        .loading .spinner-border {
+            display: inline-block;
+        }
+        .model-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+        }
+        .progress-bar {
+            transition: width 0.5s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- Header -->
+        <div class="card header-card">
+            <h1><i class="fas fa-shield-alt"></i> Fake News Detection System</h1>
+            <p>Multimodal AI-Powered Content Verification</p>
+        </div>
+
+        <!-- Input Form -->
+        <div class="card input-card">
+            <h3 class="mb-4"><i class="fas fa-newspaper"></i> Analyze News Content</h3>
+            <form id="analysisForm">
+                <div class="mb-3">
+                    <label for="headline" class="form-label">Headline / Title *</label>
+                    <input type="text" class="form-control form-control-lg" id="headline" 
+                           placeholder="Enter the news headline..." required>
+                </div>
+                <div class="mb-4">
+                    <label for="body" class="form-label">Article Body (Optional)</label>
+                    <textarea class="form-control" id="body" rows="6" 
+                              placeholder="Paste the article text here for deeper analysis..."></textarea>
+                </div>
+                <div class="text-center">
+                    <button type="submit" class="btn btn-primary btn-analyze">
+                        <span class="btn-text">
+                            <i class="fas fa-search"></i> Analyze Content
+                        </span>
+                        <span class="spinner-border spinner-border-sm ms-2" role="status"></span>
+                    </button>
+                </div>
+            </form>
+
+            <!-- Model Info -->
+            <div class="model-info">
+                <small>
+                    <strong>Model:</strong> {{ metadata.model_name }} | 
+                    <strong>Accuracy:</strong> {{ "%.2f"|format(metadata.accuracy * 100) }}% | 
+                    <strong>F1-Score:</strong> {{ "%.4f"|format(metadata.f1_score) }}
+                </small>
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div class="card" id="results">
+            <div id="verdictSection"></div>
+            
+            <div class="p-4">
+                <h4 class="mb-3"><i class="fas fa-chart-bar"></i> Detailed Analysis</h4>
+                
+                <!-- Confidence Progress Bars -->
+                <div class="mb-4">
+                    <h6>ML Model Confidence:</h6>
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between mb-1">
+                            <small>Fake News</small>
+                            <small id="mlFakePercent">0%</small>
+                        </div>
+                        <div class="progress">
+                            <div id="mlFakeBar" class="progress-bar bg-danger" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="d-flex justify-content-between mb-1">
+                            <small>Real News</small>
+                            <small id="mlRealPercent">0%</small>
+                        </div>
+                        <div class="progress">
+                            <div id="mlRealBar" class="progress-bar bg-success" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Scores -->
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="detail-row">
+                            <span class="metric-label">Final Risk Score:</span>
+                            <span class="metric-value" id="finalScore">-</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="detail-row">
+                            <span class="metric-label">ML Score:</span>
+                            <span class="metric-value" id="mlScore">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Heuristic Details -->
+                <div id="heuristicDetails"></div>
+
+                <!-- Flags -->
+                <div id="flagsSection"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const form = document.getElementById('analysisForm');
+        const results = document.getElementById('results');
+        const btnAnalyze = document.querySelector('.btn-analyze');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const headline = document.getElementById('headline').value.trim();
+            const body = document.getElementById('body').value.trim();
+
+            if (!headline) {
+                alert('Please enter a headline');
+                return;
+            }
+
+            // Show loading state
+            btnAnalyze.classList.add('loading');
+            btnAnalyze.disabled = true;
+            results.style.display = 'none';
+
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ headline, body })
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+
+                displayResults(data);
+                results.style.display = 'block';
+                results.scrollIntoView({ behavior: 'smooth' });
+
+            } catch (error) {
+                alert('Error analyzing content: ' + error.message);
+            } finally {
+                btnAnalyze.classList.remove('loading');
+                btnAnalyze.disabled = false;
+            }
+        });
+
+        function displayResults(data) {
+            // Verdict Section
+            const verdictClass = data.verdict.includes('HIGH') ? 'HIGH' : 
+                               data.verdict.includes('MODERATE') ? 'MODERATE' : 'LOW';
+            
+            document.getElementById('verdictSection').innerHTML = `
+                <div class="verdict-card verdict-${verdictClass}">
+                    <h2><i class="fas fa-${verdictClass === 'HIGH' ? 'exclamation-triangle' : 
+                                            verdictClass === 'MODERATE' ? 'exclamation-circle' : 
+                                            'check-circle'}"></i></h2>
+                    <h3>${data.verdict}</h3>
+                    <div class="score-badge">${data.confidence}% Confidence</div>
+                </div>
+            `;
+
+            // Progress bars
+            document.getElementById('mlFakeBar').style.width = data.ml_confidence.fake + '%';
+            document.getElementById('mlRealBar').style.width = data.ml_confidence.real + '%';
+            document.getElementById('mlFakePercent').textContent = data.ml_confidence.fake + '%';
+            document.getElementById('mlRealPercent').textContent = data.ml_confidence.real + '%';
+
+            // Scores
+            document.getElementById('finalScore').textContent = data.final_score;
+            document.getElementById('mlScore').textContent = data.ml_score;
+
+            // Heuristic Details
+            const heuristic = data.heuristic_details;
+            document.getElementById('heuristicDetails').innerHTML = `
+                <h6 class="mt-3">Linguistic Analysis:</h6>
+                <div class="detail-row">
+                    <span class="metric-label">Sensationalism:</span>
+                    <span class="metric-value">${heuristic.sensational_score}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="metric-label">Punctuation Anomalies:</span>
+                    <span class="metric-value">${heuristic.punctuation_score}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="metric-label">Capitalization:</span>
+                    <span class="metric-value">${heuristic.caps_score}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="metric-label">Content Length:</span>
+                    <span class="metric-value">${heuristic.length_score}</span>
+                </div>
+            `;
+
+            // Flags
+            if (heuristic.flags && heuristic.flags.length > 0) {
+                document.getElementById('flagsSection').innerHTML = `
+                    <h6 class="mt-3">Detected Issues:</h6>
+                    ${heuristic.flags.map(flag => `<div class="flag-item">${flag}</div>`).join('')}
+                `;
+            } else {
+                document.getElementById('flagsSection').innerHTML = '';
+            }
+        }
+    </script>
+</body>
+</html>
